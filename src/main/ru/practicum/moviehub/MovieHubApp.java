@@ -10,3 +10,4 @@ public class MovieHubApp {
         server.start();
     }
 }
+// Реализовано в рамках учебного задания
