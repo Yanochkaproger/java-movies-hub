@@ -1,0 +1,20 @@
+### Получить все фильмы
+GET http://localhost:8080/movies
+
+### Добавить фильм
+POST http://localhost:8080/movies
+Content-Type: application/json
+
+{
+  "title": "Inception",
+  "year": 2010
+}
+
+### Получить фильм по ID
+GET http://localhost:8080/movies/1
+
+### Удалить фильм
+DELETE http://localhost:8080/movies/1
+
+### Получить фильмы 2010 года
+GET http://localhost:8080/movies?year=2010
