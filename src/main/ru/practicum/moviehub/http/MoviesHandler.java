@@ -14,7 +14,6 @@ import java.util.List;
 
 public class MoviesHandler extends BaseHttpHandler {
     private final MoviesStore store;
-    private static final int CURRENT_YEAR = java.time.Year.now().getValue();
 
     public MoviesHandler(MoviesStore store) {
         this.store = store;
@@ -22,25 +21,24 @@ public class MoviesHandler extends BaseHttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
+        // ИЗМЕНЕНО: сравнение методов без учёта регистра
         String method = exchange.getRequestMethod();
         String path = exchange.getRequestURI().getPath();
         String query = exchange.getRequestURI().getQuery();
 
         if ("/movies".equals(path)) {
-            if ("GET".equals(method)) {
+            if ("GET".equalsIgnoreCase(method)) {
                 handleGetMovies(exchange, query);
-            } else if ("POST".equals(method)) {
+            } else if ("POST".equalsIgnoreCase(method)) {
                 handlePostMovie(exchange);
             } else {
                 sendErrorResponse(exchange, 405, "Метод не поддерживается");
             }
         } else if (path.startsWith("/movies/")) {
-            // Обрабатываем ЛЮБОЙ путь после /movies/
             String idStr = path.substring("/movies/".length());
-
-            if ("GET".equals(method)) {
+            if ("GET".equalsIgnoreCase(method)) {
                 handleGetMovieById(exchange, idStr);
-            } else if ("DELETE".equals(method)) {
+            } else if ("DELETE".equalsIgnoreCase(method)) {
                 handleDeleteMovie(exchange, idStr);
             } else {
                 sendErrorResponse(exchange, 405, "Метод не поддерживается");
@@ -56,7 +54,7 @@ public class MoviesHandler extends BaseHttpHandler {
             String yearParam = query.substring("year=".length());
             try {
                 int year = Integer.parseInt(yearParam);
-                if (year < 1888 || year > CURRENT_YEAR + 1) {
+                if (year < MIN_MOVIE_YEAR || year > MAX_MOVIE_YEAR) {
                     sendErrorResponse(exchange, 400, "Некорректный параметр запроса — 'year'");
                     return;
                 }
@@ -91,18 +89,8 @@ public class MoviesHandler extends BaseHttpHandler {
             return;
         }
 
-        List<String> errors = new ArrayList<>();
-
-        if (movie.getTitle() == null || movie.getTitle().trim().isEmpty()) {
-            errors.add("название не должно быть пустым");
-        } else if (movie.getTitle().length() > 100) {
-            errors.add("название не должно превышать 100 символов");
-        }
-
-        if (movie.getYear() < 1888 || movie.getYear() > CURRENT_YEAR + 1) {
-            errors.add("год должен быть между 1888 и " + (CURRENT_YEAR + 1));
-        }
-
+        // ИЗМЕНЕНО: валидация вынесена в отдельный метод
+        List<String> errors = validateMovie(movie);
         if (!errors.isEmpty()) {
             sendErrorResponse(exchange, 422, "Ошибка валидации", errors);
             return;
@@ -113,10 +101,24 @@ public class MoviesHandler extends BaseHttpHandler {
         sendJsonResponse(exchange, 201, json);
     }
 
+    // ИЗМЕНЕНО: новый метод для валидации
+    private List<String> validateMovie(Movie movie) {
+        List<String> errors = new ArrayList<>();
+        if (movie.getTitle() == null || movie.getTitle().trim().isEmpty()) {
+            errors.add("название не должно быть пустым");
+        } else if (movie.getTitle().length() > 100) {
+            errors.add("название не должно превышать 100 символов");
+        }
+        if (movie.getYear() < MIN_MOVIE_YEAR || movie.getYear() > MAX_MOVIE_YEAR) {
+            errors.add("год должен быть между " + MIN_MOVIE_YEAR + " и " + MAX_MOVIE_YEAR);
+        }
+        return errors;
+    }
+
     private void handleGetMovieById(HttpExchange exchange, String idStr) throws IOException {
         Long id = parseId(idStr, exchange);
         if (id == null) {
-            return; // Ошибка 400 уже отправлена
+            return;
         }
 
         Movie movie = store.findById(id);
@@ -132,7 +134,7 @@ public class MoviesHandler extends BaseHttpHandler {
     private void handleDeleteMovie(HttpExchange exchange, String idStr) throws IOException {
         Long id = parseId(idStr, exchange);
         if (id == null) {
-            return; // Ошибка 400 уже отправлена
+            return;
         }
 
         boolean deleted = store.deleteById(id);
