@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.practicum.moviehub.api.ErrorResponse;
+import ru.practicum.moviehub.model.Movie;
 import ru.practicum.moviehub.store.MoviesStore;
 
 import java.net.URI;
@@ -14,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,7 +29,6 @@ public class MoviesApiTest {
     private static final java.lang.reflect.Type LIST_OF_MOVIES = new ListOfMoviesTypeToken().getType();
     private static MoviesStore store;
 
-    // ИЗМЕНЕНО: вспомогательные методы для удобства тестов
     private HttpResponse<String> get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:8080" + path))
@@ -55,22 +56,20 @@ public class MoviesApiTest {
         return CLIENT.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 
-    private int createMovieAndGetId(String title, int year) throws Exception {
-        String json = GSON.toJson(new Object() {
-            String title = title;
-            int year = year;
-        });
+    private long createMovieAndGetId(String title, int year) throws Exception {
+        Movie movie = new Movie();
+        movie.setTitle(title);
+        movie.setYear(year);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertEquals(201, resp.statusCode());
-        ru.practicum.moviehub.model.Movie m = GSON.fromJson(resp.body(), ru.practicum.moviehub.model.Movie.class);
-        return (int) m.getId();
+        Movie m = GSON.fromJson(resp.body(), Movie.class);
+        return m.getId();
     }
 
     private void assertStartLine(HttpResponse<String> resp, int expectedStatus) {
         assertEquals(expectedStatus, resp.statusCode());
     }
-
-    // ИЗМЕНЕНО: добавлены все тесты
 
     @BeforeAll
     static void beforeAll() {
@@ -93,21 +92,19 @@ public class MoviesApiTest {
     void getMovies_whenEmpty_returnsEmptyArray() throws Exception {
         HttpResponse<String> resp = get("/movies");
         assertStartLine(resp, 200);
-
-        java.util.List<ru.practicum.moviehub.model.Movie> movies = GSON.fromJson(resp.body().trim(), LIST_OF_MOVIES);
+        List<Movie> movies = GSON.fromJson(resp.body().trim(), LIST_OF_MOVIES);
         assertTrue(movies.isEmpty(), "Ожидается пустой список");
     }
 
     @Test
     void postMovie_whenValid_returns201AndObject() throws Exception {
-        String json = GSON.toJson(new Object() {
-            String title = "FilmA";
-            int year = 2010;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("FilmA");
+        movie.setYear(2010);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertStartLine(resp, 201);
-
-        ru.practicum.moviehub.model.Movie created = GSON.fromJson(resp.body(), ru.practicum.moviehub.model.Movie.class);
+        Movie created = GSON.fromJson(resp.body(), Movie.class);
         assertNotNull(created.getId());
         assertEquals("FilmA", created.getTitle());
         assertEquals(2010, created.getYear());
@@ -115,61 +112,60 @@ public class MoviesApiTest {
 
     @Test
     void postMovie_whenEmptyTitle_returns422() throws Exception {
-        String json = GSON.toJson(new Object() {
-            String title = "";
-            int year = 2010;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("");
+        movie.setYear(2010);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertStartLine(resp, 422);
         ErrorResponse err = GSON.fromJson(resp.body(), ErrorResponse.class);
         assertNotNull(err.getError());
-        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("title")));
+        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("название")));
     }
 
     @Test
     void postMovie_whenTooLongTitle_returns422() throws Exception {
-        String longTitle = "A".repeat(101);
-        String json = GSON.toJson(new Object() {
-            String title = longTitle;
-            int year = 2010;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("A".repeat(101));
+        movie.setYear(2010);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertStartLine(resp, 422);
         ErrorResponse err = GSON.fromJson(resp.body(), ErrorResponse.class);
-        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("title")));
+        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("название")));
     }
 
     @Test
     void postMovie_whenYearTooSmall_returns422() throws Exception {
-        String json = GSON.toJson(new Object() {
-            String title = "Old";
-            int year = 1800;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("Old");
+        movie.setYear(1800);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertStartLine(resp, 422);
         ErrorResponse err = GSON.fromJson(resp.body(), ErrorResponse.class);
-        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("year")));
+        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("год")));
     }
 
     @Test
     void postMovie_whenYearTooBig_returns422() throws Exception {
         int farFuture = java.time.LocalDate.now().getYear() + 10;
-        String json = GSON.toJson(new Object() {
-            String title = "Future";
-            int year = farFuture;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("Future");
+        movie.setYear(farFuture);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, true);
         assertStartLine(resp, 422);
         ErrorResponse err = GSON.fromJson(resp.body(), ErrorResponse.class);
-        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("year")));
+        assertTrue(err.getDetails().stream().anyMatch(d -> d.toLowerCase().contains("год")));
     }
 
     @Test
     void postMovie_whenMissingContentType_returns415() throws Exception {
-        String json = GSON.toJson(new Object() {
-            String title = "NoCT";
-            int year = 2020;
-        });
+        Movie movie = new Movie();
+        movie.setTitle("NoCT");
+        movie.setYear(2020);
+        String json = GSON.toJson(movie);
         HttpResponse<String> resp = post("/movies", json, false);
         assertStartLine(resp, 415);
     }
@@ -184,11 +180,9 @@ public class MoviesApiTest {
     void getMovies_whenNotEmpty_returnsList() throws Exception {
         createMovieAndGetId("One", 2010);
         createMovieAndGetId("Two", 2014);
-
         HttpResponse<String> resp = get("/movies");
         assertStartLine(resp, 200);
-
-        java.util.List<ru.practicum.moviehub.model.Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
+        List<Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
         assertEquals(2, movies.size());
     }
 
@@ -197,10 +191,9 @@ public class MoviesApiTest {
         createMovieAndGetId("A2010", 2010);
         createMovieAndGetId("B2014", 2014);
         createMovieAndGetId("C2010", 2010);
-
         HttpResponse<String> resp = get("/movies?year=2010");
         assertStartLine(resp, 200);
-        java.util.List<ru.practicum.moviehub.model.Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
+        List<Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
         assertEquals(2, movies.size());
         assertTrue(movies.stream().allMatch(m -> m.getYear() == 2010));
         assertTrue(movies.stream().anyMatch(m -> "A2010".equals(m.getTitle())));
@@ -212,7 +205,7 @@ public class MoviesApiTest {
         createMovieAndGetId("Only2014", 2014);
         HttpResponse<String> resp = get("/movies?year=1999");
         assertStartLine(resp, 200);
-        java.util.List<ru.practicum.moviehub.model.Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
+        List<Movie> movies = GSON.fromJson(resp.body(), LIST_OF_MOVIES);
         assertTrue(movies.isEmpty());
     }
 
@@ -224,10 +217,10 @@ public class MoviesApiTest {
 
     @Test
     void getMovieById_whenExists_returns200() throws Exception {
-        int id = createMovieAndGetId("FindMe", 2015);
+        long id = createMovieAndGetId("FindMe", 2015);
         HttpResponse<String> resp = get("/movies/" + id);
         assertStartLine(resp, 200);
-        ru.practicum.moviehub.model.Movie m = GSON.fromJson(resp.body(), ru.practicum.moviehub.model.Movie.class);
+        Movie m = GSON.fromJson(resp.body(), Movie.class);
         assertEquals(id, m.getId());
         assertEquals("FindMe", m.getTitle());
     }
@@ -246,10 +239,9 @@ public class MoviesApiTest {
 
     @Test
     void deleteMovie_whenExists_returns204_then404OnGet() throws Exception {
-        int id = createMovieAndGetId("DeleteMe", 2011);
+        long id = createMovieAndGetId("DeleteMe", 2011);
         HttpResponse<String> del = delete("/movies/" + id);
         assertEquals(204, del.statusCode());
-
         HttpResponse<String> getAfter = get("/movies/" + id);
         assertEquals(404, getAfter.statusCode());
     }
