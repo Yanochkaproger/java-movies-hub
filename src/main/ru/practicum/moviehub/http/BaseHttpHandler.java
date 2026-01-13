@@ -12,9 +12,13 @@ import com.google.gson.Gson;
 public abstract class BaseHttpHandler implements HttpHandler {
     protected static final Gson GSON = new Gson();
 
+    protected static final String CONTENT_TYPE_JSON = "application/json; charset=UTF-8";
+    protected static final int MIN_MOVIE_YEAR = 1888;
+    protected static final int MAX_MOVIE_YEAR = java.time.Year.now().getValue() + 1;
+
     protected void sendJsonResponse(HttpExchange exchange, int statusCode, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+        exchange.getResponseHeaders().set("Content-Type", CONTENT_TYPE_JSON);
         exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
